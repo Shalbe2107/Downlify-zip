@@ -1,0 +1,6 @@
+{
+  "name": "Quick Downloader",
+  "description": "Quick Downloader is a modern, fast, and compliant media downloader and inspector web app. Analyze URLs, preview media, and download permitted audio, video, and image files.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
