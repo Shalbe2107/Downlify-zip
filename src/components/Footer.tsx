@@ -196,33 +196,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Hostinger Deployment Card Banner */}
-        <div className="mb-10 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-500/20 dark:border-purple-400/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20">
-              <DownloadCloud className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Hostinger Node.js Deployment Package</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-                  Ready ZIP
-                </span>
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                Pre-compiled production bundle formatted for Hostinger Node.js Web App (Node 18/20/22+). Extract directly into <code className="px-1 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[11px] font-mono">public_html</code>.
-              </p>
-            </div>
-          </div>
-          <a
-            href="/quick-downloader-hostinger.zip"
-            download="quick-downloader-hostinger.zip"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/25 transition-all transform hover:-translate-y-0.5 shrink-0"
-          >
-            <DownloadCloud className="w-4 h-4" />
-            <span>Download Hostinger Package (.zip)</span>
-          </a>
-        </div>
 
         {/* Bottom Row */}
         <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
