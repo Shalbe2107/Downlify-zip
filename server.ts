@@ -9,6 +9,7 @@ import { detectPlatform } from './server/platformDetector';
 import { resolveYoutubeDownloadUrl } from './server/youtubeDownloader';
 import { generatePreviewBannerSvg } from './server/previewBannerService';
 import { getAllPosts, getPostBySlugOrId, savePost, deletePost } from './server/blogService';
+import { generateSitemapXml, getSitemapData, writeStaticSitemapXml } from './server/sitemapService';
 
 dotenv.config();
 
@@ -22,6 +23,63 @@ async function startServer() {
 
   app.use(express.json());
   app.use(express.static(path.resolve(__dirname, 'public')));
+
+  // Helper to dynamically resolve client-facing Base URL (supports custom domains, Hostinger, reverse proxies, and APP_URL env)
+  function getBaseUrl(req: Request): string {
+    if (process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL' && !process.env.APP_URL.includes('localhost')) {
+      return process.env.APP_URL.replace(/\/+$/, '');
+    }
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0].trim() : req.protocol;
+    const host = req.get('host') || `localhost:${port}`;
+    return `${protocol}://${host}`;
+  }
+
+  // --- Dynamic SEO XML Sitemap (/sitemap.xml) ---
+  // Returns dynamically updated XML containing all required core pages + every newly published blog post
+  app.get('/sitemap.xml', (req: Request, res: Response) => {
+    const baseUrl = getBaseUrl(req);
+    const xml = generateSitemapXml(baseUrl);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=1800'); // Cache 30m, auto refreshed
+    res.send(xml);
+  });
+
+  // Robots.txt directing crawlers to the sitemap
+  app.get('/robots.txt', (req: Request, res: Response) => {
+    const baseUrl = getBaseUrl(req);
+    const robots = [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /admin',
+      'Disallow: /admin-login',
+      'Disallow: /admin-dashboard',
+      'Disallow: /api/admin/',
+      '',
+      `Sitemap: ${baseUrl}/sitemap.xml`,
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(robots);
+  });
+
+  // Sitemap JSON API for visual HTML sitemap page
+  app.get('/api/sitemap-data', (req: Request, res: Response) => {
+    const baseUrl = getBaseUrl(req);
+    const data = getSitemapData(baseUrl);
+    res.json(data);
+  });
+
+  // Initial sitemap generation for public directory
+  try {
+    const defaultBaseUrl = process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL'
+      ? process.env.APP_URL.replace(/\/+$/, '')
+      : `http://localhost:${port}`;
+    writeStaticSitemapXml(defaultBaseUrl);
+  } catch (err) {
+    console.warn('Initial sitemap sync note:', err);
+  }
 
   // Hostinger production zip package download endpoint
   app.get('/api/download-hostinger-package', (_req: Request, res: Response) => {
@@ -289,6 +347,14 @@ async function startServer() {
         readTime: readTime || '3 min read',
         slug: slug || '',
       });
+
+      // Synchronize static sitemap file on post creation or update
+      try {
+        writeStaticSitemapXml(getBaseUrl(req));
+      } catch (e) {
+        console.warn('Sitemap sync on save:', e);
+      }
+
       res.json({ success: true, post: saved });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save blog post.';
@@ -306,6 +372,12 @@ async function startServer() {
     const { id } = req.params;
     const success = deletePost(id);
     if (success) {
+      // Synchronize static sitemap file on post deletion
+      try {
+        writeStaticSitemapXml(getBaseUrl(req));
+      } catch (e) {
+        console.warn('Sitemap sync on delete:', e);
+      }
       res.json({ success: true, message: 'Article deleted successfully.' });
     } else {
       res.status(404).json({ error: 'Article not found or could not be deleted.' });

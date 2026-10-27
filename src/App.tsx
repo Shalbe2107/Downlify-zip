@@ -28,6 +28,7 @@ import {
   CopyrightPolicyPage, 
   DisclaimerPage 
 } from './pages/LegalPages';
+import { SitemapPage } from './pages/SitemapPage';
 
 import { 
   MediaInfo, 
@@ -302,6 +303,10 @@ function QuickDownloaderMainApp() {
 
         {currentRoute === 'disclaimer' && (
           <DisclaimerPage onNavigate={handleNavigate} />
+        )}
+
+        {currentRoute === 'sitemap' && (
+          <SitemapPage onNavigate={handleNavigate} />
         )}
       </main>
 

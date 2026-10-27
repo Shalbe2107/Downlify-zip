@@ -1,8 +1,8 @@
 // server.ts
 import express from "express";
 import dotenv from "dotenv";
-import path2 from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import path3 from "path";
+import { fileURLToPath as fileURLToPath3 } from "url";
 
 // server/platformDetector.ts
 function detectPlatform(inputUrl) {
@@ -2114,18 +2114,294 @@ function deletePost(id) {
   return false;
 }
 
-// server.ts
-dotenv.config();
+// server/sitemapService.ts
+import fs2 from "fs";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename2 = fileURLToPath2(import.meta.url);
 var __dirname2 = path2.dirname(__filename2);
+var CORE_PAGES = [
+  {
+    path: "/",
+    title: "Home - Multi-Platform Media Downloader & Link Inspector",
+    changefreq: "daily",
+    priority: 1,
+    category: "core",
+    description: "Instant media extraction, preview, and download engine for YouTube, Facebook, Instagram, TikTok, Pinterest, and direct links."
+  },
+  {
+    path: "/blog",
+    title: "Streaming Guides, Tutorials & Tech Insights Blog",
+    changefreq: "daily",
+    priority: 0.9,
+    category: "blog",
+    description: "Articles, in-depth technical guides, video codec analysis, and audio extraction tips."
+  },
+  {
+    path: "/how-it-works",
+    title: "How It Works - Simple 3-Step Media Downloader Guide",
+    changefreq: "weekly",
+    priority: 0.8,
+    category: "core",
+    description: "Step-by-step instructions on pasting URLs, selecting video/audio formats, and downloading."
+  },
+  {
+    path: "/supported-platforms",
+    title: "Supported Platforms & Media Formats",
+    changefreq: "weekly",
+    priority: 0.8,
+    category: "core",
+    description: "Full list of supported media networks including YouTube, TikTok, Facebook, Instagram, Vimeo, Reddit, SoundCloud, and Pinterest."
+  },
+  {
+    path: "/faq",
+    title: "Frequently Asked Questions (FAQ)",
+    changefreq: "weekly",
+    priority: 0.8,
+    category: "support",
+    description: "Answers about video resolutions, 320kbps MP3 audio extraction, privacy, and browser compatibility."
+  },
+  {
+    path: "/about",
+    title: "About Quick Downloader - Architecture & Zero-Log Model",
+    changefreq: "monthly",
+    priority: 0.7,
+    category: "core",
+    description: "Our mission, technology stack, and commitment to zero-log client-side streaming and privacy."
+  },
+  {
+    path: "/contact",
+    title: "Contact Us & Developer Support",
+    changefreq: "monthly",
+    priority: 0.7,
+    category: "support",
+    description: "Get in touch with the Quick Downloader support team for inquiries, bug reports, and feedback."
+  },
+  {
+    path: "/privacy",
+    title: "Privacy Policy",
+    changefreq: "monthly",
+    priority: 0.5,
+    category: "legal",
+    description: "Our strict zero-log ephemeral data retention policy and client privacy safeguards."
+  },
+  {
+    path: "/terms",
+    title: "Terms of Service",
+    changefreq: "monthly",
+    priority: 0.5,
+    category: "legal",
+    description: "Terms of usage, permitted personal streaming, and fair use guidelines."
+  },
+  {
+    path: "/copyright",
+    title: "Copyright Policy & DMCA Notice",
+    changefreq: "monthly",
+    priority: 0.5,
+    category: "legal",
+    description: "Intellectual property notice, copyright compliance, and DMCA takedown request procedure."
+  },
+  {
+    path: "/disclaimer",
+    title: "Legal Disclaimer",
+    changefreq: "monthly",
+    priority: 0.5,
+    category: "legal",
+    description: "Legal disclaimers regarding third-party platform trademarks and service utility usage."
+  },
+  {
+    path: "/sitemap",
+    title: "HTML Site Index & Visual Sitemap",
+    changefreq: "weekly",
+    priority: 0.5,
+    category: "support",
+    description: "Interactive index of all pages, articles, and resource URLs across Quick Downloader."
+  }
+];
+function escapeXml2(unsafe) {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case "&":
+        return "&amp;";
+      case "'":
+        return "&apos;";
+      case '"':
+        return "&quot;";
+      default:
+        return c;
+    }
+  });
+}
+function formatDateToIso(dateStr) {
+  if (!dateStr) {
+    return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  }
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    }
+    return d.toISOString().split("T")[0];
+  } catch {
+    return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  }
+}
+function generateSitemapXml(baseUrl) {
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const publishedPosts = getAllPosts(false);
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+`;
+  xml += `        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+`;
+  xml += `        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+`;
+  xml += `        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+`;
+  xml += `  <!-- Required Core Pages -->
+`;
+  for (const page of CORE_PAGES) {
+    const fullUrl = page.path === "/" ? `${cleanBase}/` : `${cleanBase}${page.path}`;
+    xml += `  <url>
+`;
+    xml += `    <loc>${escapeXml2(fullUrl)}</loc>
+`;
+    xml += `    <lastmod>${today}</lastmod>
+`;
+    xml += `    <changefreq>${page.changefreq}</changefreq>
+`;
+    xml += `    <priority>${page.priority.toFixed(1)}</priority>
+`;
+    xml += `  </url>
+`;
+  }
+  xml += `
+  <!-- Published Blog Articles (Auto-Synchronized Dynamic URLs) -->
+`;
+  for (const post of publishedPosts) {
+    const postSlug = encodeURIComponent(post.slug);
+    const postUrl = `${cleanBase}/blog/${postSlug}`;
+    const lastModDate = formatDateToIso(post.updatedAt || post.publishedAt);
+    xml += `  <url>
+`;
+    xml += `    <loc>${escapeXml2(postUrl)}</loc>
+`;
+    xml += `    <lastmod>${lastModDate}</lastmod>
+`;
+    xml += `    <changefreq>monthly</changefreq>
+`;
+    xml += `    <priority>0.8</priority>
+`;
+    xml += `  </url>
+`;
+  }
+  xml += `</urlset>
+`;
+  return xml;
+}
+function getSitemapData(baseUrl) {
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const publishedPosts = getAllPosts(false);
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const coreEntries = CORE_PAGES.map((p) => ({
+    ...p,
+    url: p.path === "/" ? `${cleanBase}/` : `${cleanBase}${p.path}`,
+    lastmod: today
+  }));
+  const articleEntries = publishedPosts.map((post) => ({
+    path: `/blog/${post.slug}`,
+    url: `${cleanBase}/blog/${encodeURIComponent(post.slug)}`,
+    title: post.title,
+    changefreq: "monthly",
+    priority: 0.8,
+    lastmod: formatDateToIso(post.updatedAt || post.publishedAt),
+    category: "blog",
+    description: post.excerpt
+  }));
+  return {
+    totalUrls: coreEntries.length + articleEntries.length,
+    coreCount: coreEntries.length,
+    articlesCount: articleEntries.length,
+    lastGenerated: (/* @__PURE__ */ new Date()).toISOString(),
+    corePages: coreEntries,
+    articles: articleEntries,
+    baseUrl: cleanBase
+  };
+}
+function writeStaticSitemapXml(baseUrl) {
+  try {
+    const xml = generateSitemapXml(baseUrl);
+    const publicDir = path2.resolve(__dirname2, "..", "public");
+    if (fs2.existsSync(publicDir)) {
+      fs2.writeFileSync(path2.join(publicDir, "sitemap.xml"), xml, "utf-8");
+    }
+  } catch (err) {
+    console.error("Error writing static sitemap.xml:", err);
+  }
+}
+
+// server.ts
+dotenv.config();
+var __filename3 = fileURLToPath3(import.meta.url);
+var __dirname3 = path3.dirname(__filename3);
 async function startServer() {
   const app = express();
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3e3;
   const isDev = process.env.NODE_ENV !== "production";
   app.use(express.json());
-  app.use(express.static(path2.resolve(__dirname2, "public")));
+  app.use(express.static(path3.resolve(__dirname3, "public")));
+  function getBaseUrl(req) {
+    if (process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" && !process.env.APP_URL.includes("localhost")) {
+      return process.env.APP_URL.replace(/\/+$/, "");
+    }
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
+    const host = req.get("host") || `localhost:${port}`;
+    return `${protocol}://${host}`;
+  }
+  app.get("/sitemap.xml", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const xml = generateSitemapXml(baseUrl);
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=1800");
+    res.send(xml);
+  });
+  app.get("/robots.txt", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const robots = [
+      "User-agent: *",
+      "Allow: /",
+      "Disallow: /admin",
+      "Disallow: /admin-login",
+      "Disallow: /admin-dashboard",
+      "Disallow: /api/admin/",
+      "",
+      `Sitemap: ${baseUrl}/sitemap.xml`
+    ].join("\n");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(robots);
+  });
+  app.get("/api/sitemap-data", (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const data = getSitemapData(baseUrl);
+    res.json(data);
+  });
+  try {
+    const defaultBaseUrl = process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" ? process.env.APP_URL.replace(/\/+$/, "") : `http://localhost:${port}`;
+    writeStaticSitemapXml(defaultBaseUrl);
+  } catch (err) {
+    console.warn("Initial sitemap sync note:", err);
+  }
   app.get("/api/download-hostinger-package", (_req, res) => {
-    const zipPath = path2.resolve(__dirname2, "public", "quick-downloader-hostinger.zip");
+    const zipPath = path3.resolve(__dirname3, "public", "quick-downloader-hostinger.zip");
     res.download(zipPath, "quick-downloader-hostinger.zip", (err) => {
       if (err && !res.headersSent) {
         res.status(404).json({ error: "Hostinger deployment package not found." });
@@ -2335,6 +2611,11 @@ async function startServer() {
         readTime: readTime || "3 min read",
         slug: slug || ""
       });
+      try {
+        writeStaticSitemapXml(getBaseUrl(req));
+      } catch (e) {
+        console.warn("Sitemap sync on save:", e);
+      }
       res.json({ success: true, post: saved });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save blog post.";
@@ -2349,6 +2630,11 @@ async function startServer() {
     const { id } = req.params;
     const success = deletePost(id);
     if (success) {
+      try {
+        writeStaticSitemapXml(getBaseUrl(req));
+      } catch (e) {
+        console.warn("Sitemap sync on delete:", e);
+      }
       res.json({ success: true, message: "Article deleted successfully." });
     } else {
       res.status(404).json({ error: "Article not found or could not be deleted." });
@@ -2366,10 +2652,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path2.resolve(__dirname2, "dist");
+    const distPath = path3.resolve(__dirname3, "dist");
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path2.resolve(distPath, "index.html"));
+      res.sendFile(path3.resolve(distPath, "index.html"));
     });
   }
   app.listen(port, "0.0.0.0", () => {

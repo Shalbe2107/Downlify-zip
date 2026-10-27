@@ -107,4 +107,5 @@ export type PageRoute =
   | 'privacy'
   | 'terms'
   | 'copyright'
-  | 'disclaimer';
+  | 'disclaimer'
+  | 'sitemap';

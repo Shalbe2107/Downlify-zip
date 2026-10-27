@@ -183,6 +183,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   Disclaimer
                 </button>
               </li>
+              <li>
+                <button
+                  onClick={() => handleLinkClick('sitemap')}
+                  className="text-purple-600 dark:text-purple-400 hover:underline transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>Sitemap (XML & Index)</span>
+                </button>
+              </li>
               <li className="pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   onClick={() => handleLinkClick('admin-login')}

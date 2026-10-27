@@ -73,6 +73,9 @@ export function parseCurrentUrl(): RouteState {
   if (pathname === '/disclaimer' || hash === 'disclaimer') {
     return { route: 'disclaimer', blogSlug: null };
   }
+  if (pathname === '/sitemap' || hash === 'sitemap' || pathname === '/sitemap.xml') {
+    return { route: 'sitemap', blogSlug: null };
+  }
 
   return { route: 'home', blogSlug: null };
 }
@@ -109,6 +112,8 @@ export function routeToUrl(route: PageRoute, blogSlug?: string | null): string {
       return '/copyright';
     case 'disclaimer':
       return '/disclaimer';
+    case 'sitemap':
+      return '/sitemap';
     default:
       return '/';
   }
@@ -149,6 +154,8 @@ export function getPageTitle(route: PageRoute, blogTitle?: string | null): strin
       return `Copyright & DMCA Policy | ${brand}`;
     case 'disclaimer':
       return `Legal Disclaimer | ${brand}`;
+    case 'sitemap':
+      return `Site Index & XML Sitemap | ${brand}`;
     default:
       return brand;
   }
