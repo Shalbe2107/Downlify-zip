@@ -219,22 +219,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Hero Headline */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.25] text-balance">
           <span className="text-slate-900 dark:text-white">Download </span>
-          <span className="bg-red-600 text-white px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-md shadow-red-500/25 inline-block mx-1.5 align-middle">
+          <span className="bg-red-600 text-white px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md shadow-xs inline-block mx-1 align-middle">
             Your Favourate
           </span>
           <span className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400 bg-clip-text text-transparent">
-            {' '}Medie Flie....
+            {' '}Media File
           </span>
         </h1>
 
         {/* Short Value Proposition Description */}
-        <p className="mt-4 sm:mt-5 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-balance font-bold">
-          <span className="text-black font-bold">Paste video, audio, or image links from YouTube, TikTok, Instagram, </span>
-          <span className="text-[#eb00b0] font-bold inline">
-            Pinterest, Facebook, Vimeo, or direct files. Extract formats,{' '}
-          </span>
-          <span className="text-blue-600 font-bold inline">
-            preview streams, and download in pristine high definition.
+        <p className="mt-4 sm:mt-5 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-balance text-black font-semibold">
+          Paste video, audio, or image links from YouTube, TikTok, Instagram, Pinterest, Facebook, Vimeo, or direct files. Extract formats, preview streams,{' '}
+          <span className="bg-[#c3ff00] text-black px-1.5 py-0.5 rounded-md inline-block font-semibold">
+            download in pristine high definition.
           </span>
         </p>
 

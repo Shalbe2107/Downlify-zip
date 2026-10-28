@@ -67,10 +67,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li>
                 <button
                   onClick={() => handleLinkClick('blog')}
-                  className="text-purple-600 dark:text-purple-400 font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer"
                 >
-                  <span>Blog & Articles</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">New</span>
+                  Blog & Articles
                 </button>
               </li>
               <li>
@@ -186,9 +185,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li>
                 <button
                   onClick={() => handleLinkClick('sitemap')}
-                  className="text-purple-600 dark:text-purple-400 hover:underline transition-colors cursor-pointer flex items-center gap-1"
+                  className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer"
                 >
-                  <span>Sitemap (XML & Index)</span>
+                  Sitemap (XML & Index)
                 </button>
               </li>
               <li className="pt-2 border-t border-slate-200 dark:border-slate-800">

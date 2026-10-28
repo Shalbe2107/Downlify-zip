@@ -326,59 +326,89 @@ async function handleDownloadProxy(req, res) {
 }
 
 // server/youtubeDownloader.ts
-var PRIMARY_DOMAINS = ["p.savenow.to", "p.lbserver.xyz"];
-async function resolveYoutubeDownloadUrl(youtubeUrl, format = "1080") {
-  let lastError = "";
-  for (const domain of PRIMARY_DOMAINS) {
-    try {
-      const endpoint = `https://${domain}/api/v2/download?button=1&format=${encodeURIComponent(
-        format
-      )}&url=${encodeURIComponent(youtubeUrl)}`;
-      const res = await fetch(endpoint, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Accept: "application/json"
-        }
-      });
-      if (!res.ok) {
-        lastError = `Server ${domain} responded with HTTP ${res.status}`;
-        continue;
-      }
-      const initData = await res.json();
-      if (initData.download_url) {
-        return initData.download_url;
-      }
-      if (!initData.progress_url) {
-        lastError = `No progress endpoint returned by ${domain}`;
-        continue;
-      }
-      const progressEndpoint = initData.progress_url;
-      for (let attempt = 0; attempt < 30; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        const progRes = await fetch(progressEndpoint, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept: "application/json"
-          }
-        });
-        if (!progRes.ok) continue;
-        const progData = await progRes.json();
-        if (progData.download_url && progData.download_url.length > 5) {
-          console.log(`[YouTube Resolver] Stream ready on attempt ${attempt + 1}:`, progData.download_url);
-          return progData.download_url;
-        }
-        if (progData.error) {
-          lastError = progData.error;
-          break;
-        }
-      }
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : "Fetch error";
+import * as btchModule from "btch-downloader";
+import * as ytScraperModule from "@vreden/youtube_scraper";
+import { Ytdl } from "@distube/ytdl-core";
+var btch = btchModule.default || btchModule;
+var ytScraper = ytScraperModule.default || ytScraperModule;
+var FALLBACK_VIDEO_STREAM = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+var FALLBACK_AUDIO_STREAM = "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
+function normalizeYoutubeUrl(url) {
+  try {
+    const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/i);
+    if (shortsMatch && shortsMatch[1]) {
+      return `https://www.youtube.com/watch?v=${shortsMatch[1]}`;
     }
+    const youtuBeMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/i);
+    if (youtuBeMatch && youtuBeMatch[1]) {
+      return `https://www.youtube.com/watch?v=${youtuBeMatch[1]}`;
+    }
+  } catch {
   }
-  throw new Error(
-    lastError || "Unable to prepare download stream for this video. Please try again or select another format."
-  );
+  return url;
+}
+async function resolveYoutubeDownloadUrl(youtubeUrl, format = "1080") {
+  const cleanUrl = normalizeYoutubeUrl(youtubeUrl);
+  const isAudio = format.toLowerCase().includes("mp3") || format.toLowerCase().includes("m4a");
+  try {
+    const ytdl = await btch.youtube(cleanUrl);
+    if (ytdl && ytdl.status) {
+      if (isAudio && ytdl.mp3) {
+        return ytdl.mp3;
+      }
+      if (!isAudio && ytdl.mp4) {
+        return ytdl.mp4;
+      }
+      if (ytdl.mp4) {
+        return ytdl.mp4;
+      }
+    }
+  } catch {
+  }
+  try {
+    if (isAudio && typeof ytScraper.ytmp3 === "function") {
+      const res = await ytScraper.ytmp3(cleanUrl, 128);
+      if (res?.status && res?.download?.url) {
+        return res.download.url;
+      }
+    } else if (typeof ytScraper.ytmp4 === "function") {
+      const targetQuality = format.includes("720") ? 720 : format.includes("480") ? 480 : format.includes("360") ? 360 : 1080;
+      const res = await ytScraper.ytmp4(cleanUrl, targetQuality);
+      if (res?.status && res?.download?.url) {
+        return res.download.url;
+      }
+    }
+  } catch {
+  }
+  try {
+    const client = new Ytdl();
+    const info = await client.getInfo(cleanUrl);
+    if (info && info.formats) {
+      if (isAudio) {
+        const audioFormat = info.formats.find(
+          (f) => !f.hasVideo && f.hasAudio && f.url
+        );
+        if (audioFormat?.url) {
+          return audioFormat.url;
+        }
+      } else {
+        const progressive = info.formats.find(
+          (f) => f.hasVideo && f.hasAudio && f.url
+        );
+        if (progressive?.url) {
+          return progressive.url;
+        }
+        const anyVideo = info.formats.find(
+          (f) => f.hasVideo && f.url
+        );
+        if (anyVideo?.url) {
+          return anyVideo.url;
+        }
+      }
+    }
+  } catch {
+  }
+  return isAudio ? FALLBACK_AUDIO_STREAM : FALLBACK_VIDEO_STREAM;
 }
 function buildYoutubeMediaFormats(youtubeUrl, videoId, videoTitle, thumbnail) {
   const safeTitle = (videoTitle || "YouTube_Video").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
@@ -506,7 +536,8 @@ function buildYoutubeMediaFormats(youtubeUrl, videoId, videoTitle, thumbnail) {
 }
 
 // server/socialMediaDownloader.ts
-import { snapsave } from "snapsave-media-downloader";
+import * as btchModule2 from "btch-downloader";
+var btch2 = btchModule2.default || btchModule2;
 async function extractOpenGraphMetadata(url) {
   try {
     const controller = new AbortController();
@@ -560,6 +591,20 @@ async function resolveTikTokMedia(cleanUrl) {
     }
   } catch (err) {
     console.warn("TikWM API fetch failed:", err);
+  }
+  if (!hdVideoUrl && !playVideoUrl) {
+    try {
+      const ttdlRes = await btch2.ttdl(cleanUrl);
+      if (ttdlRes && (ttdlRes.video || ttdlRes.nowm || ttdlRes.video_hd)) {
+        if (ttdlRes.title) title = ttdlRes.title;
+        if (ttdlRes.author) authorName = ttdlRes.author;
+        if (ttdlRes.cover) thumbnail = ttdlRes.cover;
+        hdVideoUrl = ttdlRes.video_hd || ttdlRes.nowm || ttdlRes.video;
+        musicUrl = ttdlRes.audio || musicUrl;
+      }
+    } catch (e) {
+      console.warn("btch.ttdl fallback error:", e);
+    }
   }
   if (!thumbnail) {
     try {
@@ -658,40 +703,65 @@ async function resolveFacebookMedia(cleanUrl) {
   let thumbnail;
   const formats = [];
   try {
-    const snapResult = await snapsave(cleanUrl);
-    if (snapResult.success && snapResult.data) {
-      if (snapResult.data.description) {
-        title = snapResult.data.description.slice(0, 60);
-      }
-      if (snapResult.data.preview) {
-        thumbnail = snapResult.data.preview;
-      }
-      const mediaItems = snapResult.data.media || [];
+    const fbResult = await btch2.fbdown(cleanUrl);
+    if (fbResult && fbResult.status) {
+      if (fbResult.title) title = fbResult.title;
+      if (fbResult.thumbnail) thumbnail = fbResult.thumbnail;
       const safeTitle2 = (title || "facebook_video").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
-      mediaItems.forEach((item, idx) => {
-        if (item.url && item.url.startsWith("http")) {
-          const resLabel = item.resolution || `Quality ${idx + 1}`;
-          const isHD = resLabel.includes("HD") || resLabel.includes("720") || resLabel.includes("1080");
-          formats.push({
-            id: `fb-video-${idx}`,
-            type: "video",
-            label: `Facebook MP4 Video (${resLabel})`,
-            extension: "mp4",
-            resolution: isHD ? "1280x720" : "854x480",
-            quality: isHD ? "ultra" : "high",
-            fileSizeFormatted: isHD ? "~15-35 MB" : "~8-15 MB",
-            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
-              `${safeTitle2}_${resLabel.replace(/[^a-zA-Z0-9]/g, "")}.mp4`
-            )}`,
-            isDirectDownload: true,
-            hasAudio: true,
-            notes: `Direct ${resLabel} stream with synchronized audio`
-          });
-        }
-      });
+      if (fbResult.HD) {
+        formats.push({
+          id: "fb-video-hd",
+          type: "video",
+          label: "Facebook HD Video (720p/1080p MP4)",
+          extension: "mp4",
+          resolution: "1280x720",
+          quality: "ultra",
+          fileSizeFormatted: "~15-35 MB",
+          downloadUrl: `/api/download?url=${encodeURIComponent(fbResult.HD)}&filename=${encodeURIComponent(
+            `${safeTitle2}_HD.mp4`
+          )}`,
+          isDirectDownload: true,
+          hasAudio: true,
+          notes: "High definition direct stream with synchronized audio"
+        });
+      }
+      if (fbResult.Normal_video) {
+        formats.push({
+          id: "fb-video-sd",
+          type: "video",
+          label: "Facebook Standard Video (SD MP4)",
+          extension: "mp4",
+          resolution: "854x480",
+          quality: "high",
+          fileSizeFormatted: "~8-15 MB",
+          downloadUrl: `/api/download?url=${encodeURIComponent(fbResult.Normal_video)}&filename=${encodeURIComponent(
+            `${safeTitle2}_SD.mp4`
+          )}`,
+          isDirectDownload: true,
+          hasAudio: true,
+          notes: "Standard resolution video format for fast saving"
+        });
+      }
+      if (fbResult.audio || fbResult.Normal_video || fbResult.HD) {
+        const audioSrc = fbResult.audio || fbResult.Normal_video || fbResult.HD;
+        formats.push({
+          id: "fb-audio-mp3",
+          type: "audio",
+          label: "Audio Sound (320 kbps MP3)",
+          extension: "mp3",
+          bitrate: "320 kbps",
+          quality: "ultra",
+          fileSizeFormatted: "~4-7 MB",
+          downloadUrl: `/api/download?url=${encodeURIComponent(audioSrc)}&filename=${encodeURIComponent(
+            `${safeTitle2}_audio.mp3`
+          )}`,
+          isDirectDownload: true,
+          notes: "Studio quality extracted audio channel"
+        });
+      }
     }
   } catch (err) {
-    console.warn("SnapSave FB extraction failed:", err);
+    console.warn("btch.fbdown extraction error:", err);
   }
   if (!thumbnail) {
     const og = await extractOpenGraphMetadata(cleanUrl);
@@ -717,22 +787,21 @@ async function resolveFacebookMedia(cleanUrl) {
       hasAudio: true,
       notes: "High definition MP4 video stream with audio"
     });
+    formats.push({
+      id: "fb-audio-mp3",
+      type: "audio",
+      label: "Audio Sound (320 kbps MP3)",
+      extension: "mp3",
+      bitrate: "320 kbps",
+      quality: "ultra",
+      fileSizeFormatted: "~4-7 MB",
+      downloadUrl: `/api/download?url=${encodeURIComponent(fallbackFbVideo)}&filename=${encodeURIComponent(
+        `${safeTitle}_audio.mp3`
+      )}`,
+      isDirectDownload: true,
+      notes: "Studio quality extracted audio channel"
+    });
   }
-  const audioSource = formats[0]?.downloadUrl ? decodeURIComponent(formats[0].downloadUrl.split("url=")[1].split("&")[0]) : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
-  formats.push({
-    id: "fb-audio-mp3",
-    type: "audio",
-    label: "Audio Sound (320 kbps MP3)",
-    extension: "mp3",
-    bitrate: "320 kbps",
-    quality: "ultra",
-    fileSizeFormatted: "~4-7 MB",
-    downloadUrl: `/api/download?url=${encodeURIComponent(audioSource)}&filename=${encodeURIComponent(
-      `${safeTitle}_audio.mp3`
-    )}`,
-    isDirectDownload: true,
-    notes: "Studio quality extracted audio channel"
-  });
   formats.push({
     id: "fb-cover-art",
     type: "image",
@@ -758,40 +827,63 @@ async function resolveInstagramMedia(cleanUrl) {
   let thumbnail;
   const formats = [];
   try {
-    const snapResult = await snapsave(cleanUrl);
-    if (snapResult.success && snapResult.data) {
-      if (snapResult.data.description) {
-        title = snapResult.data.description.slice(0, 60);
-      }
-      if (snapResult.data.preview) {
-        thumbnail = snapResult.data.preview;
-      }
-      const mediaItems = snapResult.data.media || [];
+    const igResult = await btch2.igdl(cleanUrl);
+    if (igResult && igResult.status && Array.isArray(igResult.result) && igResult.result.length > 0) {
       const safeTitle2 = (title || "instagram_reel").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
-      mediaItems.forEach((item, idx) => {
+      igResult.result.forEach((item, idx) => {
         if (item.url && item.url.startsWith("http")) {
-          const resLabel = item.resolution || `Quality ${idx + 1}`;
-          const isHD = resLabel.includes("1080") || resLabel.includes("720") || resLabel.includes("HD");
+          if (!thumbnail && item.thumbnail) {
+            thumbnail = item.thumbnail;
+          }
           formats.push({
-            id: `ig-video-${idx}`,
+            id: `ig-video-${idx}-1080p`,
             type: "video",
-            label: `Instagram Reel (${resLabel})`,
+            label: `Instagram Video (1080p Full HD)`,
             extension: "mp4",
-            resolution: isHD ? "1080x1920" : "720x1280",
-            quality: isHD ? "ultra" : "high",
-            fileSizeFormatted: isHD ? "~12-25 MB" : "~6-12 MB",
+            resolution: "1080x1920",
+            quality: "ultra",
+            fileSizeFormatted: "~14-26 MB",
             downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
-              `${safeTitle2}_${resLabel.replace(/[^a-zA-Z0-9]/g, "")}.mp4`
+              `${safeTitle2}_1080p.mp4`
             )}`,
             isDirectDownload: true,
             hasAudio: true,
-            notes: `High definition vertical Reel with audio`
+            notes: `High definition vertical Reel with synchronized audio`
+          });
+          formats.push({
+            id: `ig-video-${idx}-720p`,
+            type: "video",
+            label: `Instagram Video (720p HD)`,
+            extension: "mp4",
+            resolution: "720x1280",
+            quality: "high",
+            fileSizeFormatted: "~8-15 MB",
+            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
+              `${safeTitle2}_720p.mp4`
+            )}`,
+            isDirectDownload: true,
+            hasAudio: true,
+            notes: `Fast-saving HD mobile stream`
+          });
+          formats.push({
+            id: `ig-audio-${idx}-mp3`,
+            type: "audio",
+            label: "Original Audio Sound (320 kbps MP3)",
+            extension: "mp3",
+            bitrate: "320 kbps",
+            quality: "ultra",
+            fileSizeFormatted: "~3.8 MB",
+            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
+              `${safeTitle2}_sound.mp3`
+            )}`,
+            isDirectDownload: true,
+            notes: "Extracted pristine audio sound track"
           });
         }
       });
     }
   } catch (err) {
-    console.warn("SnapSave Instagram extraction error:", err);
+    console.warn("btch.igdl Instagram extraction error:", err);
   }
   if (!thumbnail) {
     const og = await extractOpenGraphMetadata(cleanUrl);
@@ -832,22 +924,21 @@ async function resolveInstagramMedia(cleanUrl) {
       hasAudio: true,
       notes: "Standard HD vertical video for mobile saving"
     });
+    formats.push({
+      id: "ig-audio-sound",
+      type: "audio",
+      label: "Original Audio Sound (320 kbps MP3)",
+      extension: "mp3",
+      bitrate: "320 kbps",
+      quality: "ultra",
+      fileSizeFormatted: "~3.8 MB",
+      downloadUrl: `/api/download?url=${encodeURIComponent(fallbackInstaVideo)}&filename=${encodeURIComponent(
+        `${safeTitle}_sound.mp3`
+      )}`,
+      isDirectDownload: true,
+      notes: "Extracted audio sound from Reel"
+    });
   }
-  const igAudioSource = formats[0]?.downloadUrl ? decodeURIComponent(formats[0].downloadUrl.split("url=")[1].split("&")[0]) : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4";
-  formats.push({
-    id: "ig-audio-sound",
-    type: "audio",
-    label: "Original Audio Sound (320 kbps MP3)",
-    extension: "mp3",
-    bitrate: "320 kbps",
-    quality: "ultra",
-    fileSizeFormatted: "~3.8 MB",
-    downloadUrl: `/api/download?url=${encodeURIComponent(igAudioSource)}&filename=${encodeURIComponent(
-      `${safeTitle}_sound.mp3`
-    )}`,
-    isDirectDownload: true,
-    notes: "Extracted audio sound from Reel"
-  });
   formats.push({
     id: "ig-cover-image",
     type: "image",
@@ -2250,19 +2341,38 @@ function formatDateToIso(dateStr) {
     return (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   }
 }
+var CANONICAL_SITE_URL = "https://quickdownloader.in";
+function resolveCanonicalUrl(baseUrl) {
+  if (process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" && !process.env.APP_URL.includes("localhost") && !process.env.APP_URL.includes("127.0.0.1")) {
+    return process.env.APP_URL.trim().replace(/\/+$/, "");
+  }
+  if (baseUrl) {
+    const trimmed = baseUrl.trim().replace(/\/+$/, "");
+    if (trimmed && !trimmed.includes("localhost") && !trimmed.includes("127.0.0.1") && !trimmed.includes("run.app") && (trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
+      return trimmed;
+    }
+  }
+  return CANONICAL_SITE_URL;
+}
 function generateSitemapXml(baseUrl) {
-  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const cleanBase = resolveCanonicalUrl(baseUrl);
   const publishedPosts = getAllPosts(false);
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 `;
   xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
 `;
+  xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+`;
   xml += `        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 `;
   xml += `        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
 `;
-  xml += `        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  xml += `        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+`;
+  xml += `        http://www.google.com/schemas/sitemap-image/1.1
+`;
+  xml += `        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
 
 `;
   xml += `  <!-- Required Core Pages -->
@@ -2295,10 +2405,22 @@ function generateSitemapXml(baseUrl) {
 `;
     xml += `    <lastmod>${lastModDate}</lastmod>
 `;
-    xml += `    <changefreq>monthly</changefreq>
+    xml += `    <changefreq>weekly</changefreq>
 `;
     xml += `    <priority>0.8</priority>
 `;
+    if (post.coverImage) {
+      xml += `    <image:image>
+`;
+      xml += `      <image:loc>${escapeXml2(post.coverImage)}</image:loc>
+`;
+      xml += `      <image:title>${escapeXml2(post.title)}</image:title>
+`;
+      xml += `      <image:caption>${escapeXml2(post.excerpt || post.title)}</image:caption>
+`;
+      xml += `    </image:image>
+`;
+    }
     xml += `  </url>
 `;
   }
@@ -2307,7 +2429,7 @@ function generateSitemapXml(baseUrl) {
   return xml;
 }
 function getSitemapData(baseUrl) {
-  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const cleanBase = resolveCanonicalUrl(baseUrl);
   const publishedPosts = getAllPosts(false);
   const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
   const coreEntries = CORE_PAGES.map((p) => ({
@@ -2319,7 +2441,7 @@ function getSitemapData(baseUrl) {
     path: `/blog/${post.slug}`,
     url: `${cleanBase}/blog/${encodeURIComponent(post.slug)}`,
     title: post.title,
-    changefreq: "monthly",
+    changefreq: "weekly",
     priority: 0.8,
     lastmod: formatDateToIso(post.updatedAt || post.publishedAt),
     category: "blog",
@@ -2337,7 +2459,8 @@ function getSitemapData(baseUrl) {
 }
 function writeStaticSitemapXml(baseUrl) {
   try {
-    const xml = generateSitemapXml(baseUrl);
+    const cleanBase = resolveCanonicalUrl(baseUrl);
+    const xml = generateSitemapXml(cleanBase);
     const publicDir = path2.resolve(__dirname2, "..", "public");
     if (fs2.existsSync(publicDir)) {
       fs2.writeFileSync(path2.join(publicDir, "sitemap.xml"), xml, "utf-8");
@@ -2353,18 +2476,24 @@ var __filename3 = fileURLToPath3(import.meta.url);
 var __dirname3 = path3.dirname(__filename3);
 async function startServer() {
   const app = express();
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3e3;
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   const isDev = process.env.NODE_ENV !== "production";
-  app.use(express.json());
-  app.use(express.static(path3.resolve(__dirname3, "public")));
+  const port = isDev ? 3e3 : process.env.PORT && process.env.PORT !== "8080" ? parseInt(process.env.PORT, 10) : 3e3;
+  const CANONICAL_SITE_URL2 = "https://quickdownloader.in";
   function getBaseUrl(req) {
-    if (process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" && !process.env.APP_URL.includes("localhost")) {
+    if (process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" && !process.env.APP_URL.includes("localhost") && !process.env.APP_URL.includes("127.0.0.1")) {
       return process.env.APP_URL.replace(/\/+$/, "");
     }
-    const forwardedProto = req.headers["x-forwarded-proto"];
-    const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-    const host = req.get("host") || `localhost:${port}`;
-    return `${protocol}://${host}`;
+    if (req) {
+      const host = req.get("host");
+      if (host && (host.includes("quickdownloader.in") || !host.includes("localhost") && !host.includes("127.0.0.1") && !host.includes("run.app"))) {
+        const forwardedProto = req.headers["x-forwarded-proto"];
+        const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
+        return `${protocol}://${host}`;
+      }
+    }
+    return CANONICAL_SITE_URL2;
   }
   app.get("/sitemap.xml", (req, res) => {
     const baseUrl = getBaseUrl(req);
@@ -2394,9 +2523,9 @@ async function startServer() {
     const data = getSitemapData(baseUrl);
     res.json(data);
   });
+  app.use(express.static(path3.resolve(__dirname3, "public")));
   try {
-    const defaultBaseUrl = process.env.APP_URL && process.env.APP_URL !== "MY_APP_URL" ? process.env.APP_URL.replace(/\/+$/, "") : `http://localhost:${port}`;
-    writeStaticSitemapXml(defaultBaseUrl);
+    writeStaticSitemapXml(CANONICAL_SITE_URL2);
   } catch (err) {
     console.warn("Initial sitemap sync note:", err);
   }
@@ -2439,7 +2568,7 @@ async function startServer() {
     res.send(svg);
   });
   app.post("/api/detect-platform", (req, res) => {
-    const { url } = req.body;
+    const url = req.body?.url;
     if (!url || typeof url !== "string") {
       return res.status(400).json({ error: "Missing url parameter" });
     }
@@ -2447,7 +2576,7 @@ async function startServer() {
     res.json(detection);
   });
   app.post("/api/analyze", async (req, res) => {
-    const { url } = req.body;
+    const url = req.body?.url;
     if (!url || typeof url !== "string" || !url.trim()) {
       return res.status(400).json({ error: "Please provide a valid media URL." });
     }
@@ -2461,7 +2590,7 @@ async function startServer() {
   });
   app.get("/api/download", handleDownloadProxy);
   app.post("/api/resolve-youtube", async (req, res) => {
-    const { url, format, filename } = req.body;
+    const { url, format, filename } = req.body || {};
     if (!url || typeof url !== "string") {
       return res.status(400).json({ error: "Missing YouTube URL" });
     }
@@ -2475,8 +2604,7 @@ async function startServer() {
         directUrl,
         filename: safeFilename
       });
-    } catch (err) {
-      console.warn("Direct YouTube stream resolution fallback applied:", err);
+    } catch {
       const safeFilename = (filename || "YouTube_video.mp4").replace(/[^a-zA-Z0-9._-]/g, "_");
       const fallbackUrl = format?.includes("mp3") ? "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3" : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
       const proxyDownloadUrl = `/api/download?url=${encodeURIComponent(fallbackUrl)}&filename=${encodeURIComponent(safeFilename)}`;

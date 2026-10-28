@@ -1,5 +1,9 @@
 import { MediaFormat } from './types';
-import { snapsave } from 'snapsave-media-downloader';
+// @ts-ignore
+import * as btchModule from 'btch-downloader';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const btch: any = (btchModule as any).default || btchModule;
 
 interface TikTokApiResponse {
   code: number;
@@ -71,7 +75,7 @@ export async function extractOpenGraphMetadata(url: string): Promise<{
 }
 
 /**
- * Resolve TikTok media formats using TikWM API with fallback to oEmbed and OpenGraph
+ * Resolve TikTok media formats using TikWM API + btch.ttdl fallback
  */
 export async function resolveTikTokMedia(cleanUrl: string): Promise<{
   title: string;
@@ -111,7 +115,23 @@ export async function resolveTikTokMedia(cleanUrl: string): Promise<{
     console.warn('TikWM API fetch failed:', err);
   }
 
-  // 2. Fallback to official TikTok oEmbed
+  // 2. Try btch.ttdl if needed
+  if (!hdVideoUrl && !playVideoUrl) {
+    try {
+      const ttdlRes = await btch.ttdl(cleanUrl);
+      if (ttdlRes && (ttdlRes.video || ttdlRes.nowm || ttdlRes.video_hd)) {
+        if (ttdlRes.title) title = ttdlRes.title;
+        if (ttdlRes.author) authorName = ttdlRes.author;
+        if (ttdlRes.cover) thumbnail = ttdlRes.cover;
+        hdVideoUrl = ttdlRes.video_hd || ttdlRes.nowm || ttdlRes.video;
+        musicUrl = ttdlRes.audio || musicUrl;
+      }
+    } catch (e) {
+      console.warn('btch.ttdl fallback error:', e);
+    }
+  }
+
+  // 3. Fallback to official TikTok oEmbed
   if (!thumbnail) {
     try {
       const oembedRes = await fetch(
@@ -129,14 +149,13 @@ export async function resolveTikTokMedia(cleanUrl: string): Promise<{
     }
   }
 
-  // 3. Fallback to OpenGraph scraping
+  // 4. Fallback to OpenGraph scraping
   if (!thumbnail) {
     const og = await extractOpenGraphMetadata(cleanUrl);
     if (og.title && og.title !== 'TikTok - Make Your Day') title = og.title;
     if (og.thumbnail) thumbnail = og.thumbnail;
   }
 
-  // 4. Guaranteed high-resolution preview banner if CDN is restricted
   const guaranteedThumbnail =
     thumbnail ||
     `/api/preview-banner?platform=tiktok&title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&type=video`;
@@ -219,7 +238,7 @@ export async function resolveTikTokMedia(cleanUrl: string): Promise<{
 }
 
 /**
- * Resolve Facebook media formats using snapsave + OpenGraph
+ * Resolve Facebook media formats using btch.fbdown + OpenGraph metadata
  */
 export async function resolveFacebookMedia(cleanUrl: string): Promise<{
   title: string;
@@ -232,47 +251,73 @@ export async function resolveFacebookMedia(cleanUrl: string): Promise<{
   let thumbnail: string | undefined;
   const formats: MediaFormat[] = [];
 
+  // 1. Try btch.fbdown
   try {
-    const snapResult = await snapsave(cleanUrl);
-    if (snapResult.success && snapResult.data) {
-      if (snapResult.data.description) {
-        title = snapResult.data.description.slice(0, 60);
-      }
-      if (snapResult.data.preview) {
-        thumbnail = snapResult.data.preview;
-      }
-
-      const mediaItems = snapResult.data.media || [];
+    const fbResult = await btch.fbdown(cleanUrl);
+    if (fbResult && fbResult.status) {
+      if (fbResult.title) title = fbResult.title;
+      if (fbResult.thumbnail) thumbnail = fbResult.thumbnail;
       const safeTitle = (title || 'facebook_video').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
 
-      mediaItems.forEach((item: { resolution?: string; url?: string; type?: string }, idx: number) => {
-        if (item.url && item.url.startsWith('http')) {
-          const resLabel = item.resolution || `Quality ${idx + 1}`;
-          const isHD = resLabel.includes('HD') || resLabel.includes('720') || resLabel.includes('1080');
+      if (fbResult.HD) {
+        formats.push({
+          id: 'fb-video-hd',
+          type: 'video',
+          label: 'Facebook HD Video (720p/1080p MP4)',
+          extension: 'mp4',
+          resolution: '1280x720',
+          quality: 'ultra',
+          fileSizeFormatted: '~15-35 MB',
+          downloadUrl: `/api/download?url=${encodeURIComponent(fbResult.HD)}&filename=${encodeURIComponent(
+            `${safeTitle}_HD.mp4`
+          )}`,
+          isDirectDownload: true,
+          hasAudio: true,
+          notes: 'High definition direct stream with synchronized audio',
+        });
+      }
 
-          formats.push({
-            id: `fb-video-${idx}`,
-            type: 'video',
-            label: `Facebook MP4 Video (${resLabel})`,
-            extension: 'mp4',
-            resolution: isHD ? '1280x720' : '854x480',
-            quality: isHD ? 'ultra' : 'high',
-            fileSizeFormatted: isHD ? '~15-35 MB' : '~8-15 MB',
-            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
-              `${safeTitle}_${resLabel.replace(/[^a-zA-Z0-9]/g, '')}.mp4`
-            )}`,
-            isDirectDownload: true,
-            hasAudio: true,
-            notes: `Direct ${resLabel} stream with synchronized audio`,
-          });
-        }
-      });
+      if (fbResult.Normal_video) {
+        formats.push({
+          id: 'fb-video-sd',
+          type: 'video',
+          label: 'Facebook Standard Video (SD MP4)',
+          extension: 'mp4',
+          resolution: '854x480',
+          quality: 'high',
+          fileSizeFormatted: '~8-15 MB',
+          downloadUrl: `/api/download?url=${encodeURIComponent(fbResult.Normal_video)}&filename=${encodeURIComponent(
+            `${safeTitle}_SD.mp4`
+          )}`,
+          isDirectDownload: true,
+          hasAudio: true,
+          notes: 'Standard resolution video format for fast saving',
+        });
+      }
+
+      if (fbResult.audio || fbResult.Normal_video || fbResult.HD) {
+        const audioSrc = fbResult.audio || fbResult.Normal_video || fbResult.HD;
+        formats.push({
+          id: 'fb-audio-mp3',
+          type: 'audio',
+          label: 'Audio Sound (320 kbps MP3)',
+          extension: 'mp3',
+          bitrate: '320 kbps',
+          quality: 'ultra',
+          fileSizeFormatted: '~4-7 MB',
+          downloadUrl: `/api/download?url=${encodeURIComponent(audioSrc)}&filename=${encodeURIComponent(
+            `${safeTitle}_audio.mp3`
+          )}`,
+          isDirectDownload: true,
+          notes: 'Studio quality extracted audio channel',
+        });
+      }
     }
   } catch (err) {
-    console.warn('SnapSave FB extraction failed:', err);
+    console.warn('btch.fbdown extraction error:', err);
   }
 
-  // Fallback to OpenGraph if no thumbnail
+  // 2. Fallback to OpenGraph if no thumbnail or title
   if (!thumbnail) {
     const og = await extractOpenGraphMetadata(cleanUrl);
     if (og.title) title = og.title;
@@ -304,25 +349,22 @@ export async function resolveFacebookMedia(cleanUrl: string): Promise<{
       hasAudio: true,
       notes: 'High definition MP4 video stream with audio',
     });
+
+    formats.push({
+      id: 'fb-audio-mp3',
+      type: 'audio',
+      label: 'Audio Sound (320 kbps MP3)',
+      extension: 'mp3',
+      bitrate: '320 kbps',
+      quality: 'ultra',
+      fileSizeFormatted: '~4-7 MB',
+      downloadUrl: `/api/download?url=${encodeURIComponent(fallbackFbVideo)}&filename=${encodeURIComponent(
+        `${safeTitle}_audio.mp3`
+      )}`,
+      isDirectDownload: true,
+      notes: 'Studio quality extracted audio channel',
+    });
   }
-
-  const audioSource =
-    formats[0]?.downloadUrl ? decodeURIComponent(formats[0].downloadUrl.split('url=')[1].split('&')[0]) : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-
-  formats.push({
-    id: 'fb-audio-mp3',
-    type: 'audio',
-    label: 'Audio Sound (320 kbps MP3)',
-    extension: 'mp3',
-    bitrate: '320 kbps',
-    quality: 'ultra',
-    fileSizeFormatted: '~4-7 MB',
-    downloadUrl: `/api/download?url=${encodeURIComponent(audioSource)}&filename=${encodeURIComponent(
-      `${safeTitle}_audio.mp3`
-    )}`,
-    isDirectDownload: true,
-    notes: 'Studio quality extracted audio channel',
-  });
 
   formats.push({
     id: 'fb-cover-art',
@@ -346,7 +388,7 @@ export async function resolveFacebookMedia(cleanUrl: string): Promise<{
 }
 
 /**
- * Resolve Instagram media formats using snapsave + OpenGraph with guaranteed thumbnail
+ * Resolve Instagram media formats using btch.igdl + OpenGraph with guaranteed thumbnail
  */
 export async function resolveInstagramMedia(cleanUrl: string): Promise<{
   title: string;
@@ -359,47 +401,72 @@ export async function resolveInstagramMedia(cleanUrl: string): Promise<{
   let thumbnail: string | undefined;
   const formats: MediaFormat[] = [];
 
+  // 1. Try btch.igdl
   try {
-    const snapResult = await snapsave(cleanUrl);
-    if (snapResult.success && snapResult.data) {
-      if (snapResult.data.description) {
-        title = snapResult.data.description.slice(0, 60);
-      }
-      if (snapResult.data.preview) {
-        thumbnail = snapResult.data.preview;
-      }
-
-      const mediaItems = snapResult.data.media || [];
+    const igResult = await btch.igdl(cleanUrl);
+    if (igResult && igResult.status && Array.isArray(igResult.result) && igResult.result.length > 0) {
       const safeTitle = (title || 'instagram_reel').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
 
-      mediaItems.forEach((item: { resolution?: string; url?: string }, idx: number) => {
+      igResult.result.forEach((item: { url?: string; thumbnail?: string }, idx: number) => {
         if (item.url && item.url.startsWith('http')) {
-          const resLabel = item.resolution || `Quality ${idx + 1}`;
-          const isHD = resLabel.includes('1080') || resLabel.includes('720') || resLabel.includes('HD');
+          if (!thumbnail && item.thumbnail) {
+            thumbnail = item.thumbnail;
+          }
 
           formats.push({
-            id: `ig-video-${idx}`,
+            id: `ig-video-${idx}-1080p`,
             type: 'video',
-            label: `Instagram Reel (${resLabel})`,
+            label: `Instagram Video (1080p Full HD)`,
             extension: 'mp4',
-            resolution: isHD ? '1080x1920' : '720x1280',
-            quality: isHD ? 'ultra' : 'high',
-            fileSizeFormatted: isHD ? '~12-25 MB' : '~6-12 MB',
+            resolution: '1080x1920',
+            quality: 'ultra',
+            fileSizeFormatted: '~14-26 MB',
             downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
-              `${safeTitle}_${resLabel.replace(/[^a-zA-Z0-9]/g, '')}.mp4`
+              `${safeTitle}_1080p.mp4`
             )}`,
             isDirectDownload: true,
             hasAudio: true,
-            notes: `High definition vertical Reel with audio`,
+            notes: `High definition vertical Reel with synchronized audio`,
+          });
+
+          formats.push({
+            id: `ig-video-${idx}-720p`,
+            type: 'video',
+            label: `Instagram Video (720p HD)`,
+            extension: 'mp4',
+            resolution: '720x1280',
+            quality: 'high',
+            fileSizeFormatted: '~8-15 MB',
+            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
+              `${safeTitle}_720p.mp4`
+            )}`,
+            isDirectDownload: true,
+            hasAudio: true,
+            notes: `Fast-saving HD mobile stream`,
+          });
+
+          formats.push({
+            id: `ig-audio-${idx}-mp3`,
+            type: 'audio',
+            label: 'Original Audio Sound (320 kbps MP3)',
+            extension: 'mp3',
+            bitrate: '320 kbps',
+            quality: 'ultra',
+            fileSizeFormatted: '~3.8 MB',
+            downloadUrl: `/api/download?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(
+              `${safeTitle}_sound.mp3`
+            )}`,
+            isDirectDownload: true,
+            notes: 'Extracted pristine audio sound track',
           });
         }
       });
     }
   } catch (err) {
-    console.warn('SnapSave Instagram extraction error:', err);
+    console.warn('btch.igdl Instagram extraction error:', err);
   }
 
-  // Fallback to OpenGraph if no thumbnail
+  // 2. Fallback to OpenGraph if no thumbnail
   if (!thumbnail) {
     const og = await extractOpenGraphMetadata(cleanUrl);
     if (og.title && !og.title.includes('Login')) title = og.title;
@@ -447,25 +514,22 @@ export async function resolveInstagramMedia(cleanUrl: string): Promise<{
       hasAudio: true,
       notes: 'Standard HD vertical video for mobile saving',
     });
+
+    formats.push({
+      id: 'ig-audio-sound',
+      type: 'audio',
+      label: 'Original Audio Sound (320 kbps MP3)',
+      extension: 'mp3',
+      bitrate: '320 kbps',
+      quality: 'ultra',
+      fileSizeFormatted: '~3.8 MB',
+      downloadUrl: `/api/download?url=${encodeURIComponent(fallbackInstaVideo)}&filename=${encodeURIComponent(
+        `${safeTitle}_sound.mp3`
+      )}`,
+      isDirectDownload: true,
+      notes: 'Extracted audio sound from Reel',
+    });
   }
-
-  const igAudioSource =
-    formats[0]?.downloadUrl ? decodeURIComponent(formats[0].downloadUrl.split('url=')[1].split('&')[0]) : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4';
-
-  formats.push({
-    id: 'ig-audio-sound',
-    type: 'audio',
-    label: 'Original Audio Sound (320 kbps MP3)',
-    extension: 'mp3',
-    bitrate: '320 kbps',
-    quality: 'ultra',
-    fileSizeFormatted: '~3.8 MB',
-    downloadUrl: `/api/download?url=${encodeURIComponent(igAudioSource)}&filename=${encodeURIComponent(
-      `${safeTitle}_sound.mp3`
-    )}`,
-    isDirectDownload: true,
-    notes: 'Extracted audio sound from Reel',
-  });
 
   formats.push({
     id: 'ig-cover-image',

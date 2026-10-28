@@ -139,6 +139,15 @@ function QuickDownloaderMainApp() {
         body: JSON.stringify({ url: clean }),
       });
 
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          res.status === 404
+            ? 'Media analyzer service is starting. Please try again in a few seconds.'
+            : 'Unable to analyze link. Please verify the media URL is public and valid.'
+        );
+      }
+
       const data = await res.json();
 
       if (!res.ok) {

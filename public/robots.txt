@@ -5,4 +5,4 @@ Disallow: /admin-login
 Disallow: /admin-dashboard
 Disallow: /api/admin/
 
-Sitemap: /sitemap.xml
+Sitemap: https://quickdownloader.in/sitemap.xml

@@ -332,8 +332,11 @@ export const MediaResultCard: React.FC<MediaResultCardProps> = ({
                 <span>Verified Stream</span>
               </div>
 
-              {/* Title */}
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug break-words">
+              {/* Title: Restricted to maximum 2 lines */}
+              <h2
+                title={mediaInfo.title}
+                className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 overflow-hidden text-ellipsis break-words"
+              >
                 {mediaInfo.title}
               </h2>
 
@@ -381,8 +384,8 @@ export const MediaResultCard: React.FC<MediaResultCardProps> = ({
         </div>
 
         {/* Format Selection & Download Options */}
-        <div className="p-6 sm:p-8 bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="p-4 sm:p-7 bg-slate-50/60 dark:bg-slate-900/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div>
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                 Downloadable Media Formats
@@ -394,18 +397,23 @@ export const MediaResultCard: React.FC<MediaResultCardProps> = ({
 
             {/* Interactive Filter Tabs (Segmented control) */}
             <div className="inline-flex items-center p-1 bg-slate-200/80 dark:bg-slate-800 rounded-xl shrink-0">
-              {(['all', 'video', 'audio', 'image'] as const).map((tab) => (
+              {([
+                { key: 'all', label: 'All' },
+                { key: 'video', label: 'Video MP4' },
+                { key: 'audio', label: 'Audio MP3' },
+                { key: 'image', label: 'Images' }
+              ] as const).map((tab) => (
                 <button
-                  key={tab}
+                  key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors capitalize cursor-pointer ${
-                    activeTab === tab
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    activeTab === tab.key
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -417,98 +425,141 @@ export const MediaResultCard: React.FC<MediaResultCardProps> = ({
               No formats found under the selected category.
             </div>
           ) : (
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {filteredFormats.map((format, idx) => {
                 const isDownloading = downloadingId === format.id;
                 const isSuccess = downloadSuccessId === format.id;
-                const slideDirection = idx % 2 === 0 ? 'slide-in-from-left-6' : 'slide-in-from-right-6';
+                
+                // Determine quality badge styling (4K, FHD, HD, MP3, etc.)
+                const res = (format.resolution || '').toLowerCase();
+                const lbl = (format.label || '').toLowerCase();
+                let badgeText = (format.extension || 'HD').toUpperCase();
+                let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+
+                if (res.includes('2160') || res.includes('4k') || lbl.includes('4k')) {
+                  badgeText = '4K';
+                  badgeClass = 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800';
+                } else if (res.includes('1080') || res.includes('fhd') || lbl.includes('1080') || lbl.includes('fhd')) {
+                  badgeText = 'FHD';
+                  badgeClass = 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800';
+                } else if (res.includes('720') || res.includes('hd') || lbl.includes('720') || lbl.includes('hd')) {
+                  badgeText = 'HD';
+                  badgeClass = 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-800';
+                } else if (format.type === 'audio') {
+                  badgeText = format.extension.toUpperCase() || 'MP3';
+                  badgeClass = 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800';
+                } else if (format.type === 'image') {
+                  badgeText = format.extension.toUpperCase() || 'IMG';
+                  badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800';
+                }
+
+                const hasFps = format.bitrate?.includes('fps') || format.label.includes('60fps');
+                const fpsText = format.bitrate?.includes('fps') ? format.bitrate : '60 fps';
 
                 return (
                   <div
                     key={format.id}
-                    style={{ animationDelay: `${idx * 60}ms` }}
-                    className={`p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-white via-slate-50 to-purple-50/40 dark:from-slate-800/90 dark:via-slate-800/80 dark:to-purple-950/20 border border-slate-200/90 dark:border-slate-700/80 shadow-md hover:-translate-y-1 hover:scale-[1.01] hover:shadow-xl hover:shadow-purple-500/15 hover:border-purple-400 dark:hover:border-purple-500 transition-all duration-300 ease-out flex flex-col sm:flex-row sm:items-center justify-between gap-4 group animate-in fade-in ${slideDirection} duration-500 fill-mode-both`}
+                    style={{ animationDelay: `${idx * 40}ms` }}
+                    className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-600/80 transition-all duration-200 flex items-center justify-between gap-3 sm:gap-4 group"
                   >
-                    {/* Format Information */}
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                        {format.type === 'video' ? (
-                          <FileVideo className="w-5 h-5" />
-                        ) : format.type === 'audio' ? (
-                          <FileAudio className="w-5 h-5" />
-                        ) : (
-                          <FileImage className="w-5 h-5" />
-                        )}
+                    {/* Left & Middle: Badge + Clean Organized Details */}
+                    <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                      {/* Quality / Container Badge */}
+                      <div
+                        className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-black text-xs uppercase shrink-0 border select-none ${badgeClass}`}
+                      >
+                        {badgeText}
                       </div>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
+                      {/* Main Details Block */}
+                      <div className="min-w-0 flex-1">
+                        {/* Row 1: Format Label & optional FPS indicator */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                             {format.label}
                           </span>
-                          <span className="text-[11px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                            {format.extension}
-                          </span>
+                          {hasFps && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              {fpsText}
+                            </span>
+                          )}
                         </div>
 
-                        {/* Unboxed Metadata Line */}
-                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 mt-1">
-                          {format.resolution && <span className="font-semibold text-slate-800 dark:text-slate-200">{format.resolution}</span>}
-                          {format.resolution && format.bitrate && <span aria-hidden="true" className="text-slate-400">·</span>}
-                          {format.bitrate && <span className="font-semibold text-indigo-700 dark:text-indigo-300">{format.bitrate}</span>}
-                          {(format.resolution || format.bitrate) && format.fileSizeFormatted && (
-                            <span aria-hidden="true" className="text-slate-400">·</span>
+                        {/* Row 2: Organized metadata row where every single piece is an unbreakable unit */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1 flex-wrap">
+                          <span className="font-semibold uppercase text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                            {format.extension}
+                          </span>
+
+                          {format.resolution && (
+                            <>
+                              <span aria-hidden="true" className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                              <span className="whitespace-nowrap font-medium text-slate-700 dark:text-slate-300">
+                                {format.resolution}
+                              </span>
+                            </>
                           )}
+
+                          {format.bitrate && !format.bitrate.includes('fps') && (
+                            <>
+                              <span aria-hidden="true" className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                              <span className="whitespace-nowrap font-medium text-indigo-600 dark:text-indigo-400">
+                                {format.bitrate}
+                              </span>
+                            </>
+                          )}
+
                           {format.fileSizeFormatted && (
-                            <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-white">{format.fileSizeFormatted}</span>
+                            <>
+                              <span aria-hidden="true" className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                              <span className="whitespace-nowrap font-bold text-slate-900 dark:text-white tabular-nums">
+                                {format.fileSizeFormatted}
+                              </span>
+                            </>
                           )}
+
                           {format.notes && (
                             <>
-                              <span aria-hidden="true" className="text-slate-400">·</span>
-                              <span className="truncate max-w-[200px] text-slate-500 dark:text-slate-400">{format.notes}</span>
+                              <span aria-hidden="true" className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                              <span className="whitespace-nowrap truncate max-w-[130px] sm:max-w-[200px] text-slate-500 dark:text-slate-400">
+                                {format.notes}
+                              </span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Action Controls */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                      <a
-                        href={format.downloadUrl}
-                        download={`${(mediaInfo.title || 'media_file').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 45)}.${format.extension}`}
-                        title="Direct Native Download (Tap to open/save directly)"
-                        className="p-2.5 rounded-xl text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300 hover:bg-white dark:hover:bg-slate-700/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm transition-all cursor-pointer hover:scale-105"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleDownload(format)}
                         disabled={isDownloading}
-                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all duration-200 cursor-pointer ${
+                        className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-bold rounded-xl shadow-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                           isSuccess
                             ? 'bg-emerald-600 text-white shadow-emerald-500/25'
-                            : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-indigo-500/25 active:scale-95 hover:shadow-indigo-500/40 hover:scale-[1.02]'
+                            : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-indigo-500/25 active:scale-95'
                         } disabled:opacity-75`}
                       >
                         {isDownloading ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span className="truncate max-w-[160px] sm:max-w-none">
+                            <span className="truncate max-w-[120px] sm:max-w-none">
                               {downloadStatusText || `Saving (${downloadProgress}%)`}
                             </span>
                           </>
                         ) : isSuccess ? (
                           <>
                             <Check className="w-3.5 h-3.5" />
-                            <span>Saved to Downloads!</span>
+                            <span>Saved!</span>
                           </>
                         ) : (
                           <>
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download {format.extension.toUpperCase()}</span>
+                            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="hidden sm:inline">Download {format.extension.toUpperCase()}</span>
+                            <span className="sm:hidden">Download</span>
                           </>
                         )}
                       </button>

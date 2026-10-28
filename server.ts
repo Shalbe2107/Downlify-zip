@@ -18,25 +18,33 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
   const isDev = process.env.NODE_ENV !== 'production';
+  // Dev server must always bind to port 3000. In production (Hostinger), use custom PORT or 3000.
+  const port = isDev ? 3000 : (process.env.PORT && process.env.PORT !== '8080' ? parseInt(process.env.PORT, 10) : 3000);
 
-  app.use(express.json());
-  app.use(express.static(path.resolve(__dirname, 'public')));
+  const CANONICAL_SITE_URL = 'https://quickdownloader.in';
 
-  // Helper to dynamically resolve client-facing Base URL (supports custom domains, Hostinger, reverse proxies, and APP_URL env)
-  function getBaseUrl(req: Request): string {
-    if (process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL' && !process.env.APP_URL.includes('localhost')) {
+  // Helper to dynamically resolve client-facing Base URL (strictly defaults to https://quickdownloader.in for Google Search Console)
+  function getBaseUrl(req?: Request): string {
+    if (process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL' && !process.env.APP_URL.includes('localhost') && !process.env.APP_URL.includes('127.0.0.1')) {
       return process.env.APP_URL.replace(/\/+$/, '');
     }
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0].trim() : req.protocol;
-    const host = req.get('host') || `localhost:${port}`;
-    return `${protocol}://${host}`;
+    if (req) {
+      const host = req.get('host');
+      if (host && (host.includes('quickdownloader.in') || (!host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('run.app')))) {
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const protocol = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0].trim() : req.protocol;
+        return `${protocol}://${host}`;
+      }
+    }
+    return CANONICAL_SITE_URL;
   }
 
   // --- Dynamic SEO XML Sitemap (/sitemap.xml) ---
-  // Returns dynamically updated XML containing all required core pages + every newly published blog post
+  // Must be registered before express.static to guarantee live generation with https://quickdownloader.in
   app.get('/sitemap.xml', (req: Request, res: Response) => {
     const baseUrl = getBaseUrl(req);
     const xml = generateSitemapXml(baseUrl);
@@ -71,12 +79,11 @@ async function startServer() {
     res.json(data);
   });
 
-  // Initial sitemap generation for public directory
+  app.use(express.static(path.resolve(__dirname, 'public')));
+
+  // Synchronize pristine sitemap file to public directory with canonical domain
   try {
-    const defaultBaseUrl = process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL'
-      ? process.env.APP_URL.replace(/\/+$/, '')
-      : `http://localhost:${port}`;
-    writeStaticSitemapXml(defaultBaseUrl);
+    writeStaticSitemapXml(CANONICAL_SITE_URL);
   } catch (err) {
     console.warn('Initial sitemap sync note:', err);
   }
@@ -128,7 +135,7 @@ async function startServer() {
 
   // URL platform preview (instant, no remote fetch needed)
   app.post('/api/detect-platform', (req: Request, res: Response) => {
-    const { url } = req.body;
+    const url = req.body?.url;
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
@@ -138,7 +145,7 @@ async function startServer() {
 
   // Media Analysis endpoint
   app.post('/api/analyze', async (req: Request, res: Response) => {
-    const { url } = req.body;
+    const url = req.body?.url;
     if (!url || typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({ error: 'Please provide a valid media URL.' });
     }
@@ -157,7 +164,7 @@ async function startServer() {
 
   // Resolve YouTube direct stream URL (JSON endpoint)
   app.post('/api/resolve-youtube', async (req: Request, res: Response) => {
-    const { url, format, filename } = req.body;
+    const { url, format, filename } = req.body || {};
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Missing YouTube URL' });
     }
@@ -173,8 +180,7 @@ async function startServer() {
         directUrl,
         filename: safeFilename,
       });
-    } catch (err: unknown) {
-      console.warn('Direct YouTube stream resolution fallback applied:', err);
+    } catch {
       const safeFilename = ((filename as string) || 'YouTube_video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
       const fallbackUrl = (format as string)?.includes('mp3')
         ? 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3'

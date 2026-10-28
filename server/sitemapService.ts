@@ -151,21 +151,53 @@ function formatDateToIso(dateStr?: string): string {
   }
 }
 
+export const CANONICAL_SITE_URL = 'https://quickdownloader.in';
+
+/**
+ * Resolves the canonical base URL, strictly defaulting to https://quickdownloader.in
+ * to prevent relative paths (<loc>/</loc>) which break Google Search Console ("Couldn't fetch").
+ */
+export function resolveCanonicalUrl(baseUrl?: string): string {
+  if (process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL' && !process.env.APP_URL.includes('localhost') && !process.env.APP_URL.includes('127.0.0.1')) {
+    return process.env.APP_URL.trim().replace(/\/+$/, '');
+  }
+
+  if (baseUrl) {
+    const trimmed = baseUrl.trim().replace(/\/+$/, '');
+    if (
+      trimmed &&
+      !trimmed.includes('localhost') &&
+      !trimmed.includes('127.0.0.1') &&
+      !trimmed.includes('run.app') &&
+      (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
+    ) {
+      return trimmed;
+    }
+  }
+
+  return CANONICAL_SITE_URL;
+}
+
 /**
  * Builds standard XML sitemap string dynamically including core pages and all published blog posts.
+ * Strictly uses absolute URLs (e.g. https://quickdownloader.in/...) and Google Image Sitemap namespace
+ * as required by Google Search Console.
  */
-export function generateSitemapXml(baseUrl: string): string {
-  const cleanBase = baseUrl.replace(/\/+$/, '');
+export function generateSitemapXml(baseUrl?: string): string {
+  const cleanBase = resolveCanonicalUrl(baseUrl);
   const publishedPosts = getAllPosts(false); // Only published posts, never drafts
   const today = new Date().toISOString().split('T')[0];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
+  xml += `        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"\n`;
   xml += `        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n`;
   xml += `        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9\n`;
-  xml += `        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n\n`;
+  xml += `        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd\n`;
+  xml += `        http://www.google.com/schemas/sitemap-image/1.1\n`;
+  xml += `        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">\n\n`;
 
-  // 1. Add Required Core Pages
+  // 1. Add Required Core Pages with full absolute canonical domain
   xml += `  <!-- Required Core Pages -->\n`;
   for (const page of CORE_PAGES) {
     const fullUrl = page.path === '/' ? `${cleanBase}/` : `${cleanBase}${page.path}`;
@@ -177,7 +209,7 @@ export function generateSitemapXml(baseUrl: string): string {
     xml += `  </url>\n`;
   }
 
-  // 2. Add Each Newly Published Article's Unique URL
+  // 2. Add Each Newly Published Article's Unique Absolute URL + Image Metadata
   xml += `\n  <!-- Published Blog Articles (Auto-Synchronized Dynamic URLs) -->\n`;
   for (const post of publishedPosts) {
     const postSlug = encodeURIComponent(post.slug);
@@ -187,8 +219,17 @@ export function generateSitemapXml(baseUrl: string): string {
     xml += `  <url>\n`;
     xml += `    <loc>${escapeXml(postUrl)}</loc>\n`;
     xml += `    <lastmod>${lastModDate}</lastmod>\n`;
-    xml += `    <changefreq>monthly</changefreq>\n`;
+    xml += `    <changefreq>weekly</changefreq>\n`;
     xml += `    <priority>0.8</priority>\n`;
+
+    if (post.coverImage) {
+      xml += `    <image:image>\n`;
+      xml += `      <image:loc>${escapeXml(post.coverImage)}</image:loc>\n`;
+      xml += `      <image:title>${escapeXml(post.title)}</image:title>\n`;
+      xml += `      <image:caption>${escapeXml(post.excerpt || post.title)}</image:caption>\n`;
+      xml += `    </image:image>\n`;
+    }
+
     xml += `  </url>\n`;
   }
 
@@ -199,8 +240,8 @@ export function generateSitemapXml(baseUrl: string): string {
 /**
  * Returns structured data for the frontend HTML Sitemap page.
  */
-export function getSitemapData(baseUrl: string) {
-  const cleanBase = baseUrl.replace(/\/+$/, '');
+export function getSitemapData(baseUrl?: string) {
+  const cleanBase = resolveCanonicalUrl(baseUrl);
   const publishedPosts = getAllPosts(false);
   const today = new Date().toISOString().split('T')[0];
 
@@ -214,7 +255,7 @@ export function getSitemapData(baseUrl: string) {
     path: `/blog/${post.slug}`,
     url: `${cleanBase}/blog/${encodeURIComponent(post.slug)}`,
     title: post.title,
-    changefreq: 'monthly',
+    changefreq: 'weekly',
     priority: 0.8,
     lastmod: formatDateToIso(post.updatedAt || post.publishedAt),
     category: 'blog',
@@ -235,9 +276,10 @@ export function getSitemapData(baseUrl: string) {
 /**
  * Updates public/sitemap.xml on disk to ensure static hosts or tools have the file ready.
  */
-export function writeStaticSitemapXml(baseUrl: string): void {
+export function writeStaticSitemapXml(baseUrl?: string): void {
   try {
-    const xml = generateSitemapXml(baseUrl);
+    const cleanBase = resolveCanonicalUrl(baseUrl);
+    const xml = generateSitemapXml(cleanBase);
     const publicDir = path.resolve(__dirname, '..', 'public');
     if (fs.existsSync(publicDir)) {
       fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), xml, 'utf-8');

@@ -1,94 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-image/1.1
+        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
 
-  <!-- Required Core Application Pages -->
+  <!-- Required Core Pages -->
   <url>
-    <loc>/</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>/blog</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/blog</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>/how-it-works</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/how-it-works</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/supported-platforms</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/supported-platforms</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/faq</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/faq</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/about</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/about</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/contact</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/contact</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/privacy</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/privacy</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/terms</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/terms</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/copyright</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/copyright</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/disclaimer</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/disclaimer</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/sitemap</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/sitemap</loc>
+    <lastmod>2026-10-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
 
-  <!-- Published Blog Articles Unique URLs -->
+  <!-- Published Blog Articles (Auto-Synchronized Dynamic URLs) -->
   <url>
-    <loc>/blog/how-to-download-high-resolution-4k-video-2026</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/blog/how-to-download-high-resolution-4k-video-2026</loc>
     <lastmod>2026-10-20</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>How to Download High-Resolution 4K &amp; 1080p Video Streams in 2026</image:title>
+      <image:caption>A comprehensive walkthrough on how modern web streams, dynamic DASH/HLS manifests, and progressive MP4 containers work across mobile and desktop.</image:caption>
+    </image:image>
   </url>
   <url>
-    <loc>/blog/extracting-high-fidelity-audio-from-social-media</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/blog/extracting-high-fidelity-audio-from-social-media</loc>
     <lastmod>2026-10-18</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>The Ultimate Guide to Extracting Pristine Audio from Public Media Links</image:title>
+      <image:caption>Extract 320kbps MP3 and high-clarity AAC sound bites from podcasts, background tracks, and viral reels with zero sound degradation.</image:caption>
+    </image:image>
   </url>
   <url>
-    <loc>/blog/understanding-video-codecs-mp4-webm-av1</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/blog/understanding-video-codecs-mp4-webm-av1</loc>
     <lastmod>2026-10-15</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>Understanding Modern Video Codecs: H.264, VP9, and AV1 Explained</image:title>
+      <image:caption>A deep dive into compression efficiency, hardware decoding support, and why AV1 is poised to replace traditional codecs across mobile platforms.</image:caption>
+    </image:image>
   </url>
   <url>
-    <loc>/blog/privacy-first-downloading-zero-log-architecture</loc>
+    <loc>https://ais-dev-xuexvnctqk77ohv25q454m-197714376732.asia-southeast1.run.app/blog/privacy-first-downloading-zero-log-architecture</loc>
     <lastmod>2026-10-12</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>Privacy-First Downloading: Why Zero-Log Ephemeral Fetching Matters</image:title>
+      <image:caption>Why we never store downloaded media files or search histories on disk, ensuring 100% ephemeral processing and total user privacy.</image:caption>
+    </image:image>
   </url>
 </urlset>
